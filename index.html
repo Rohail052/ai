@@ -1,17 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Smart Chat Assistant</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek Chat Assistant (Insecure Example)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            max-height: 90vh;
+        }
+        .chat-header {
+            background-color: #007bff; /* DeepSeek blue */
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2em;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            border-bottom: 1px solid #eee;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: #e1efff; /* Light blue for user */
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .assistant-message {
+            background-color: #f1f0f0;
+            align-self: flex-start;
+            margin-right: auto;
+        }
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #eee;
+        }
+        .chat-input input {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            margin-right: 10px;
+            font-size: 1em;
+            outline: none;
+        }
+        .chat-input button {
+            background-color: #007bff; /* DeepSeek blue */
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+        .chat-input button:hover {
+            background-color: #0056b3;
+        }
+        .loading-indicator {
+            text-align: center;
+            padding: 10px;
+            color: #555;
+            display: none; /* Hidden by default */
+        }
+    </style>
 </head>
 <body>
+    <div class="chat-container">
+        <div class="chat-header">DeepSeek AI Assistant</div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="message assistant-message">Hello! I'm DeepSeek AI. How can I help you today?</div>
+        </div>
+        <div class="loading-indicator" id="loading-indicator">Assistant is typing...</div>
+        <div class="chat-input">
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button id="send-button">Send</button>
+        </div>
+    </div>
 
+    <script type="module">
+        // **WARNING: EXPOSING YOUR API KEY DIRECTLY IN CLIENT-SIDE CODE IS INSECURE.**
+        // This is for demonstration/personal experimentation ONLY.
+        // For production applications, always use a backend server to proxy API requests.
+        const API_KEY = "sk-0a05cbd4b1be43e681438ddb26d662cd"; // Your DeepSeek AI API Key
+        const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
+        const MODEL_NAME = "deepseek-chat"; // Or "deepseek-reasoner" for more advanced reasoning
 
-<!-- ✅ Tidio Live Chat -->
-<script src="//code.tidio.co/dknzsqzazptllq3meaiajmwkjiteftvi.js" async></script>
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
 
+        // To maintain conversation history
+        const conversationHistory = [{
+            role: "system",
+            content: "You are a helpful AI assistant powered by DeepSeek AI."
+        }];
 
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
 
+            addMessageToChat(message, 'user-message');
+            userInput.value = '';
+            loadingIndicator.style.display = 'block';
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+
+            // Add user message to history
+            conversationHistory.push({ role: "user", content: message });
+
+            try {
+                const response = await fetch(DEEPSEEK_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}` // DeepSeek uses Bearer token
+                    },
+                    body: JSON.stringify({
+                        model: MODEL_NAME,
+                        messages: conversationHistory, // Send the full history
+                        stream: false // Set to true for streaming responses
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API Error: ${response.status} - ${errorData.error.message || 'Unknown DeepSeek API error'}`);
+                }
+
+                const data = await response.json();
+                const assistantReply = data.choices[0].message.content; // DeepSeek uses 'choices[0].message.content'
+
+                addMessageToChat(assistantReply, 'assistant-message');
+                // Add assistant's reply to history
+                conversationHistory.push({ role: "assistant", content: assistantReply });
+
+            } catch (error) {
+                console.error('Error communicating with DeepSeek AI API:', error);
+                addMessageToChat('Oops! Something went wrong. Please try again later. (' + error.message + ')', 'assistant-message error');
+            } finally {
+                loadingIndicator.style.display = 'none';
+                chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+            }
+        }
+
+        function addMessageToChat(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', type);
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
 </body>
 </html>
